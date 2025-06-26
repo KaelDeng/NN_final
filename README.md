@@ -8,284 +8,160 @@
 .
 ├── nerfacto/           # Nerfacto模型实现
 ├── gaussian-splatting/ # 3D Gaussian Splatting模型实现
-└── README.md          # 本文件
+└── README.md           # 本文件
 ```
 
-## 🚀 快速开始
+## 🧰 环境要求
 
-### 环境要求
+- **操作系统**：Ubuntu 20.04 LTS  
+- **GPU驱动与CUDA版本**：NVIDIA显卡驱动、CUDA Toolkit 11.8  
+- **显卡型号**：NVIDIA GeForce RTX 4090（24GB显存）  
+- **处理器**：Intel Core i9高性能多核处理器  
+- **内存**：64GB DDR4 RAM  
+- **主要依赖的软件环境**：
+  - Python 3.8（Anaconda管理环境）
+  - PyTorch 2.1.2（CUDA 11.8版本）
+  - COLMAP（三维重建工具）
+  - Nerf-pytorch（用于NeRF原始模型实验）
+  - Nerfstudio（用于Nerfacto变体模型实验）
+  - 3D Gaussian Splatting官方实现
+  - TensorBoard可视化分析工具
 
-- **GPU**: NVIDIA GPU with CUDA support (推荐24GB+ VRAM)
-- **CUDA**: 11.8 (推荐)
-- **Python**: 3.8+
-- **操作系统**: Windows 10/11 或 Ubuntu Linux
+---
 
 ## 📖 Nerfacto 模型
 
-Nerfacto是一个基于NeRF (Neural Radiance Fields) 的先进3D重建模型，特别适用于真实世界场景的重建。
+Nerfacto 是一个基于 NeRF (Neural Radiance Fields) 的先进 3D 重建模型，适用于真实世界场景的高质量重建。
 
-### 安装
+### 🔧 环境搭建
+
+#### （1）NeRF-pytorch 环境搭建
 
 ```bash
-# 进入nerfacto目录
-cd nerfacto
+git clone https://github.com/yenchenlin/nerf-pytorch.git
+cd nerf-pytorch
+conda create -n nerf-pytorch python=3.8 -y
+conda activate nerf-pytorch
+pip install -r requirements.txt
+sudo apt install colmap imagemagick -y
+```
 
-# 创建conda环境
-conda create --name nerfstudio -y python=3.12
+- 主要依赖：
+  - PyTorch 1.4+
+  - Matplotlib
+  - NumPy
+  - imageio 与 imageio-ffmpeg
+  - configargparse
+  - COLMAP 与 ImageMagick（用于LLFF数据加载）
+
+#### （2）Nerfstudio 环境搭建
+
+```bash
+git clone https://github.com/nerfstudio-project/nerfstudio.git
+cd nerfstudio
+conda create --name nerfstudio python=3.8 -y
 conda activate nerfstudio
-
-# 安装PyTorch (CUDA 11.8)
-pip install torch==2.1.2+cu118 torchvision==0.16.2+cu118
-
-# 安装CUDA工具包
+pip install torch==2.1.2+cu118 torchvision==0.16.2+cu118 --extra-index-url https://download.pytorch.org/whl/cu118
 conda install -c "nvidia/label/cuda-11.8.0" cuda-toolkit
-
-# 安装tiny-cuda-nn
 pip install ninja git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
-
-# 安装nerfstudio
-pip install nerfstudio
+pip install -e .
 ```
 
-### 训练
+### 🚀 训练
 
-#### 1. 准备数据
+#### NeRF 训练
 
 ```bash
-# 使用自己的数据 (需要COLMAP处理)
-ns-process-data images --data data/your_images/ --output-dir data/processed/
+python run_nerf.py --config configs/pi.txt
 ```
 
-#### 2. 开始训练
+#### Nerfacto 训练
 
 ```bash
-# 基础训练命令
-ns-train nerfacto --data data/your_data
-
-# 自定义参数训练
-ns-train nerfacto \
-    --data data/your_data \
-    --max-num-iterations 30000 \
-    --steps-per-save 2000 \
-    --vis viewer
+ns-train nerfacto --data data/pi_process --max-num-iterations 90000 --vis viewer+tensorboard
 ```
 
-#### 3. 训练参数说明
+### 📈 测试与评估
 
-- `--data`: 数据路径
-- `--max-num-iterations`: 最大训练迭代次数 (默认30000)
-- `--steps-per-save`: 保存检查点的步数间隔
-- `--vis`: 可视化方式 (viewer, tensorboard, wandb)
-
-#### 4. 恢复训练
+#### 模型评估
 
 ```bash
-ns-train nerfacto --data data/nerfstudio/poster --load-dir outputs/.../nerfstudio_models
-```
-
-### 测试与评估
-
-#### 1. 模型评估
-
-```bash
-# 计算PSNR等指标
 ns-eval --load-config outputs/.../config.yml --output-path results.json
 ```
 
-#### 2. 可视化
+#### 可视化
 
 ```bash
-# 启动查看器
-ns-viewer --load-config outputs/.../config.yml
+tensorboard --logdir outputs/
 ```
 
-#### 3. 渲染视频
-
-```bash
-# 渲染360度视频
-ns-render --load-config outputs/.../config.yml --output-path renders/ --traj filename
-```
-
-### 高级功能
-#### 自定义配置
-
-```bash
-# 查看所有可用参数
-ns-train nerfacto --help
-
-# 自定义学习率
-ns-train nerfacto --data data/nerfstudio/poster \
-    --optimizers.fields.optimizer.lr 0.01 \
-    --optimizers.proposal_networks.optimizer.lr 0.01
-```
+访问浏览器中的 `localhost:6006` 以查看训练曲线。
 
 ---
 
 ## 🎯 3D Gaussian Splatting 模型
 
-3D Gaussian Splatting是一个基于高斯椭球体的实时渲染方法，能够实现高质量的3D重建和实时渲染。
+3D Gaussian Splatting 是一种基于高斯椭球体的实时渲染方法，可实现高质量的 3D 重建与渲染。
 
-### 安装
+### 📁 数据处理
+
+3DGS 需要如下数据输入：
+
+- 图像序列（训练输入）
+- 每张图像的相机内参与外参（pose）
+- 初始稀疏三维点云（用于高斯初始化）
+
+使用流程（以静态玩偶视频为例）：
+
+#### （1）视频抽帧
 
 ```bash
-# 进入gaussian-splatting目录
+ffmpeg -i input.mp4 -qscale:v 2 images/frame_%04d.png
+```
+
+共抽取 303 帧，分辨率为 1920×1080。
+
+#### （2）COLMAP 稀疏重建流程
+
+```bash
+colmap feature_extractor --database_path database.db --image_path images
+colmap exhaustive_matcher --database_path database.db
+mkdir sparse
+colmap mapper --database_path database.db --image_path images --output_path sparse
+colmap model_converter --input_path sparse/0 --output_path output --output_type TXT
+```
+
+- 输出内容：
+  - `cameras.txt`, `images.txt`: 相机位姿
+  - `points3D.txt`: 稀疏点云数据
+
+### 🔧 环境搭建
+
+```bash
+git clone https://github.com/graphdeco-inria/gaussian-splatting.git
 cd gaussian-splatting
-
-# 创建conda环境
-conda env create --file environment.yml
+conda create -n gaussian_splatting python=3.8 -y
 conda activate gaussian_splatting
-
-# Windows用户需要设置环境变量
-SET DISTUTILS_USE_SDK=1  # Windows only
+pip install -r requirements.txt
+cmake . && make
 ```
 
-### 数据准备
-
-#### 1. 使用COLMAP处理图像
+### 🚀 训练
 
 ```bash
-# 安装COLMAP (Ubuntu)
-sudo apt-get install colmap
-
-# 处理图像序列
-python convert.py -s /path/to/images -o /path/to/output
+python train.py -s data/qmzy/pi/pi_process --eval
 ```
 
-#### 2. 数据格式要求
+### 📊 测试与评估
 
-- 图像文件: `.jpg`, `.png`, `.jpeg`
-- 相机参数: COLMAP格式的`cameras.bin`, `images.bin`, `points3D.bin`
-- 图像目录结构:
-```
-scene/
-├── images/
-│   ├── image1.jpg
-│   ├── image2.jpg
-│   └── ...
-├── sparse/
-│   ├── cameras.bin
-│   ├── images.bin
-│   └── points3D.bin
-└── transforms.json (可选)
-```
-
-### 训练
-
-#### 1. 基础训练
+#### 可视化
 
 ```bash
-# 基础训练命令
-python train.py -s /path/to/scene
-
-# 指定输出目录
-python train.py -s /path/to/scene -m /path/to/output
+tensorboard --logdir outputs/
 ```
 
-#### 2. 训练参数
+#### 量化评估
 
-```bash
-python train.py \
-    -s /path/to/scene \
-    -m /path/to/output \
-    --iterations 30000 \
-    --resolution 4 \
-    --eval \
-    --test_iterations 7000 30000 \
-    --save_iterations 7000 30000
-```
+使用 `metrics.py` 脚本对训练完成后的模型进行图像质量评估。
 
-#### 3. 主要参数说明
-
-- `-s, --source_path`: 场景数据路径
-- `-m, --model_path`: 模型输出路径
-- `--iterations`: 训练迭代次数 (默认30000)
-- `--resolution`: 图像分辨率 (1=原始, 2=1/2, 4=1/4, 8=1/8)
-- `--eval`: 启用评估模式
-- `--test_iterations`: 测试迭代点
-- `--save_iterations`: 保存模型迭代点
-
-#### 4. 高级训练选项
-
-```bash
-# 使用深度正则化
-python train.py -s /path/to/scene -d /path/to/depths/
-
-# 使用曝光补偿
-python train.py -s /path/to/scene --exposure_lr_init 0.001 --train_test_exp
-
-# 使用抗锯齿
-python train.py -s /path/to/scene --antialiasing
-
-# 快速训练 (使用稀疏Adam优化器)
-python train.py -s /path/to/scene --optimizer_type sparse_adam
-```
-
-### 测试与评估
-
-#### 1. 渲染测试图像
-
-```bash
-# 渲染指定迭代的模型
-python render.py --iteration 30000 -s /path/to/scene -m /path/to/model
-
-# 渲染测试集
-python render.py --iteration 30000 -s /path/to/scene -m /path/to/model --eval --skip_train
-```
-
-#### 2. 计算评估指标
-
-```bash
-# 计算PSNR, SSIM等指标
-python metrics.py -m "/path/to/model1" "/path/to/model2"
-```
-
-#### 3. 完整评估流程
-
-```bash
-# 运行完整评估 (训练+渲染+指标计算)
-python full_eval.py \
-    --mipnerf360 /path/to/mipnerf360 \
-    --tanksandtemples /path/to/tanksandtemples \
-    --deepblending /path/to/deepblending \
-    --output_path ./eval_results
-```
-
-### 可视化
-
-#### 1. 实时查看器
-
-训练过程中会自动启动网络查看器，访问 `http://localhost:6009` 查看实时训练进度。
-
-#### 2. SIBR查看器
-
-```bash
-# 编译SIBR查看器
-cd SIBR_viewers
-cmake -B build . -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target install -j
-
-# 启动查看器
-./build/install/bin/SIBR_gaussianViewer_app -m /path/to/model
-```
-
-### 性能优化
-
-#### 1. 内存优化
-
-```bash
-# 使用CPU存储数据 (减少VRAM使用)
-python train.py -s /path/to/scene --data_device cpu
-
-# 降低分辨率
-python train.py -s /path/to/scene --resolution 8
-```
-
-#### 2. 训练加速
-
-```bash
-# 使用稀疏Adam优化器
-python train.py -s /path/to/scene --optimizer_type sparse_adam
-
-# 减少迭代次数
-python train.py -s /path/to/scene --iterations 15000
-```
+---
